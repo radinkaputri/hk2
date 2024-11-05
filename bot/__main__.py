@@ -52,7 +52,9 @@ from .modules import (
     gd_search,
     mirror_leech,
     status,
+    torrent_search,
     ytdlp,
+    rss,
     shell,
     users_settings,
     bot_settings,
@@ -252,6 +254,7 @@ async def main():
         bot_settings.initiate_search_tools(),
         restart_notification(),
         telegraph.create_account(),
+        torrent_search.initiate_search_tools(),
         rclone_serve_booter(),
         sync_to_async(start_aria2_listener, wait=False),
     )
