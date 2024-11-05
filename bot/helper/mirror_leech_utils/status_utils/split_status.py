@@ -1,15 +1,35 @@
 from bot import LOGGER, subprocess_lock
-from ...ext_utils.status_utils import get_readable_file_size, MirrorStatus
-
+from bot.helper.ext_utils.status_utils import get_readable_file_size, get_readable_time, MirrorStatus
+from bot.helper.ext_utils.files_utils import get_path_size
+from time import time
+import os
 
 class SplitStatus:
     def __init__(self, listener, gid):
         self.listener = listener
         self._gid = gid
         self._size = self.listener.size
+        self._start_time = time()
+        self._proccessed_bytes = 0
 
     def gid(self):
         return self._gid
+
+    def speed_raw(self):
+        return self._proccessed_bytes / (time() - self._start_time)
+
+    async def progress_raw(self):
+        await self.processed_raw()
+        try:
+            return self._proccessed_bytes / self._size * 100
+        except:
+            return 0
+
+    async def progress(self):
+        return f"{round(await self.progress_raw(), 2)}%"
+
+    def speed(self):
+        return f"{get_readable_file_size(self.speed_raw())}/s"
 
     def name(self):
         return self.listener.name
@@ -17,11 +37,28 @@ class SplitStatus:
     def size(self):
         return get_readable_file_size(self._size)
 
+    def eta(self):
+        try:
+            seconds = (self._size - self._proccessed_bytes) / self.speed_raw()
+            return get_readable_time(seconds)
+        except:
+            return "-"
+
     def status(self):
         return MirrorStatus.STATUS_SPLITTING
 
+    def processed_bytes(self):
+        return get_readable_file_size(self._proccessed_bytes)
+
+    async def processed_raw(self):
+        if self.listener.new_dir:
+            self._proccessed_bytes = await get_path_size(self.listener.new_dir)
+        else:
+            self._proccessed_bytes = await get_path_size(self.listener.dir) - self._size
+
     def task(self):
         return self
+
 
     async def cancel_task(self):
         LOGGER.info(f"Cancelling Split: {self.listener.name}")
@@ -32,4 +69,5 @@ class SplitStatus:
                 and self.listener.suproc.returncode is None
             ):
                 self.listener.suproc.kill()
+  
         await self.listener.on_upload_error("splitting stopped by user!")
