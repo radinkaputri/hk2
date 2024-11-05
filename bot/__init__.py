@@ -20,7 +20,6 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from pyrogram import Client as TgClient, enums
 from qbittorrentapi import Client as QbClient
-from sabnzbdapi import SabnzbdClient
 from socket import setdefaulttimeout
 from subprocess import Popen, run
 from time import time
@@ -55,10 +54,8 @@ LOGGER = getLogger(__name__)
 
 load_dotenv("config.env", override=True)
 
-intervals = {"status": {}, "qb": "", "jd": "", "nzb": "", "stopAll": False}
+intervals = {"status": {}, "qb": "", "stopAll": False}
 qb_torrents = {}
-jd_downloads = {}
-nzb_jobs = {}
 drives_names = []
 drives_ids = []
 index_urls = []
@@ -66,7 +63,6 @@ global_extension_filter = ["aria2", "!qB"]
 user_data = {}
 aria2_options = {}
 qbit_options = {}
-nzb_options = {}
 queued_dl = {}
 queued_up = {}
 non_queued_dl = set()
@@ -83,8 +79,6 @@ except:
 task_dict_lock = Lock()
 queue_dict_lock = Lock()
 qb_listener_lock = Lock()
-nzb_listener_lock = Lock()
-jd_lock = Lock()
 cpu_eater_lock = Lock()
 subprocess_lock = Lock()
 same_directory_lock = Lock()
@@ -136,14 +130,6 @@ if DATABASE_URL:
         if qbit_opt := db.settings.qbittorrent.find_one({"_id": BOT_ID}):
             del qbit_opt["_id"]
             qbit_options = qbit_opt
-        if nzb_opt := db.settings.nzb.find_one({"_id": BOT_ID}):
-            if ospath.exists("sabnzbd/SABnzbd.ini.bak"):
-                remove("sabnzbd/SABnzbd.ini.bak")
-            del nzb_opt["_id"]
-            ((key, value),) = nzb_opt.items()
-            file_ = key.replace("__", ".")
-            with open(f"sabnzbd/{file_}", "wb+") as f:
-                f.write(value)
         conn.close()
         BOT_TOKEN = environ.get("BOT_TOKEN", "")
         BOT_ID = BOT_TOKEN.split(":", 1)[0]
@@ -152,12 +138,6 @@ if DATABASE_URL:
         LOGGER.error(f"Database ERROR: {e}")
 else:
     config_dict = {}
-
-if ospath.exists("cfg.zip"):
-    if ospath.exists("/JDownloader/cfg"):
-        rmtree("/JDownloader/cfg", ignore_errors=True)
-    run(["7z", "x", "cfg.zip", "-o/JDownloader"])
-    remove("cfg.zip")
 
 if not ospath.exists(".netrc"):
     with open(".netrc", "w"):
@@ -254,24 +234,6 @@ if len(EXTENSION_FILTER) > 0:
         x = x.lstrip(".")
         global_extension_filter.append(x.strip().lower())
 
-JD_EMAIL = environ.get("JD_EMAIL", "")
-JD_PASS = environ.get("JD_PASS", "")
-if len(JD_EMAIL) == 0 or len(JD_PASS) == 0:
-    JD_EMAIL = ""
-    JD_PASS = ""
-
-USENET_SERVERS = environ.get("USENET_SERVERS", "")
-try:
-    if len(USENET_SERVERS) == 0:
-        USENET_SERVERS = []
-    elif (us := eval(USENET_SERVERS)) and not us[0].get("host"):
-        USENET_SERVERS = []
-    else:
-        USENET_SERVERS = eval(USENET_SERVERS)
-except:
-    log_error(f"Wrong USENET_SERVERS format: {USENET_SERVERS}")
-    USENET_SERVERS = []
-
 FILELION_API = environ.get("FILELION_API", "")
 if len(FILELION_API) == 0:
     FILELION_API = ""
@@ -295,12 +257,6 @@ if len(LEECH_FILENAME_PREFIX) == 0:
 SEARCH_PLUGINS = environ.get("SEARCH_PLUGINS", "")
 if len(SEARCH_PLUGINS) == 0:
     SEARCH_PLUGINS = ""
-else:
-    try:
-        SEARCH_PLUGINS = eval(SEARCH_PLUGINS)
-    except:
-        log_error(f"Wrong USENET_SERVERS format: {SEARCH_PLUGINS}")
-        SEARCH_PLUGINS = ""
 
 MAX_SPLIT_SIZE = 4194304000 if IS_PREMIUM_USER else 2097152000
 
@@ -417,6 +373,13 @@ NAME_SUBSTITUTE = "" if len(NAME_SUBSTITUTE) == 0 else NAME_SUBSTITUTE
 MIXED_LEECH = environ.get("MIXED_LEECH", "")
 MIXED_LEECH = MIXED_LEECH.lower() == "true" and IS_PREMIUM_USER
 
+MEGA_EMAIL = environ.get("MEGA_EMAIL", "")
+MEGA_PASSWORD = environ.get("MEGA_PASSWORD", "")
+if len(MEGA_EMAIL) == 0 or len(MEGA_PASSWORD) == 0:
+    log_warning("MEGA Credentials not provided!")
+    MEGA_EMAIL = ""
+    MEGA_PASSWORD = ""
+
 THUMBNAIL_LAYOUT = environ.get("THUMBNAIL_LAYOUT", "")
 THUMBNAIL_LAYOUT = "" if len(THUMBNAIL_LAYOUT) == 0 else THUMBNAIL_LAYOUT
 
@@ -437,8 +400,8 @@ config_dict = {
     "INCOMPLETE_TASK_NOTIFIER": INCOMPLETE_TASK_NOTIFIER,
     "INDEX_URL": INDEX_URL,
     "IS_TEAM_DRIVE": IS_TEAM_DRIVE,
-    "JD_EMAIL": JD_EMAIL,
-    "JD_PASS": JD_PASS,
+    "MEGA_EMAIL": MEGA_EMAIL,
+    "MEGA_PASSWORD": MEGA_PASSWORD,
     "LEECH_DUMP_CHAT": LEECH_DUMP_CHAT,
     "LEECH_FILENAME_PREFIX": LEECH_FILENAME_PREFIX,
     "LEECH_SPLIT_SIZE": LEECH_SPLIT_SIZE,
@@ -472,7 +435,6 @@ config_dict = {
     "USER_TRANSMISSION": USER_TRANSMISSION,
     "UPSTREAM_REPO": UPSTREAM_REPO,
     "UPSTREAM_BRANCH": UPSTREAM_BRANCH,
-    "USENET_SERVERS": USENET_SERVERS,
     "USER_SESSION_STRING": USER_SESSION_STRING,
     "USE_SERVICE_ACCOUNTS": USE_SERVICE_ACCOUNTS,
     "WEB_PINCODE": WEB_PINCODE,
@@ -496,11 +458,8 @@ if ospath.exists("list_drives.txt"):
             else:
                 index_urls.append("")
 
-if BASE_URL:
-    Popen(
-        f"gunicorn web.wserver:app --bind 0.0.0.0:{BASE_URL_PORT} --worker-class gevent",
-        shell=True,
-    )
+PORT = environ.get("PORT")
+Popen(f"gunicorn web.wserver:app --bind 0.0.0.0:{PORT} --worker-class gevent", shell=True)
 
 if ospath.exists("accounts.zip"):
     if ospath.exists("accounts"):
@@ -523,12 +482,20 @@ qbittorrent_client = QbClient(
     },
 )
 
-sabnzbd_client = SabnzbdClient(
-    host="http://localhost",
-    api_key="mltb",
-    port="8070",
-)
+log_info("Starting qBittorrent-Nox")
+run(["xon-bit", "-d", "--profile=."])
+if not ospath.exists('.netrc'):
+    with open('.netrc', 'w'):
+       pass
+run(["chmod", "600", ".netrc"])
+run(["cp", ".netrc", "/root/.netrc"])
 
+trackers = check_output("curl -Ns https://raw.githubusercontent.com/XIU2/TrackersListCollection/master/all.txt https://ngosang.github.io/trackerslist/trackers_all_http.txt https://newtrackon.com/api/all https://raw.githubusercontent.com/hezhijie0327/Trackerslist/main/trackerslist_tracker.txt | awk '$0' | tr '\n\n' ','", shell=True).decode('utf-8').rstrip(',')
+with open("a2c.conf", "a+") as a:
+    if TORRENT_TIMEOUT:
+        a.write(f"bt-stop-timeout={TORRENT_TIMEOUT}\n")
+    a.write(f"bt-tracker=[{trackers}]")
+run(["zetra", "--conf-path=/usr/src/app/a2c.conf"])
 
 aria2c_global = [
     "bt-max-open-files",
@@ -584,10 +551,6 @@ else:
     a2c_glo = {op: aria2_options[op] for op in aria2c_global if op in aria2_options}
     aria2.set_global_options(a2c_glo)
 
-
-async def get_nzb_options():
-    global nzb_options
-    nzb_options = (await sabnzbd_client.get_config())["config"]["misc"]
 
 
 bot_loop.run_until_complete(get_nzb_options())

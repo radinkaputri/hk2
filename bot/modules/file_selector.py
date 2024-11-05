@@ -12,7 +12,6 @@ from bot import (
     LOGGER,
     config_dict,
     qbittorrent_client,
-    sabnzbd_client,
 )
 from ..helper.ext_utils.bot_utils import (
     bt_selection_buttons,
@@ -81,9 +80,7 @@ async def select(_, message):
     try:
         id_ = task.gid()
         if not task.queued:
-            if task.listener.is_nzb:
-                await sabnzbd_client.pause_job(id_)
-            elif task.listener.is_qbit:
+            if task.listener.is_qbit:
                 await sync_to_async(task.update)
                 id_ = task.hash()
                 await sync_to_async(
@@ -163,8 +160,6 @@ async def get_confirm(_, query):
                         LOGGER.error(
                             f"{e} Error in resume, this mostly happens after abuse aria2. Try to use select cmd again!"
                         )
-        elif task.listener.is_nzb:
-            await sabnzbd_client.resume_job(id_)
         await send_status_message(message)
         await delete_message(message)
     else:

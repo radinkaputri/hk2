@@ -241,7 +241,7 @@ class Clone(TaskListener):
                 return
             LOGGER.info(f"Cloning Done: {self.name}")
             cmd1 = [
-                "rclone",
+                "cross-suck",
                 "lsf",
                 "--fast-list",
                 "-R",
@@ -251,7 +251,7 @@ class Clone(TaskListener):
                 destination,
             ]
             cmd2 = [
-                "rclone",
+                "cross-suck",
                 "lsf",
                 "--fast-list",
                 "-R",
@@ -261,7 +261,7 @@ class Clone(TaskListener):
                 destination,
             ]
             cmd3 = [
-                "rclone",
+                "cross-suck",
                 "size",
                 "--fast-list",
                 "--json",

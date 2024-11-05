@@ -3,7 +3,6 @@ from flask import Flask, request
 from logging import getLogger, FileHandler, StreamHandler, INFO, basicConfig
 from qbittorrentapi import NotFound404Error, Client as qbClient
 from time import sleep
-from sabnzbdapi import SabnzbdClient
 from asyncio import get_running_loop, new_event_loop, set_event_loop
 
 from web.nodes import make_tree
@@ -22,12 +21,6 @@ qbittorrent_client = qbClient(
     VERIFY_WEBUI_CERTIFICATE=False,
     REQUESTS_ARGS={"timeout": (30, 60)},
     HTTPADAPTER_ARGS={"pool_maxsize": 200, "pool_block": True},
-)
-
-sabnzbd_client = SabnzbdClient(
-    host="http://localhost",
-    api_key="mltb",
-    port="8070",
 )
 
 aria2 = ariaAPI(ariaClient(host="http://localhost", port=6800, secret=""))
@@ -733,14 +726,6 @@ def list_torrent_contents(id_):
     if request.args["pin_code"] != pincode:
         return "<h1>Incorrect pin code</h1>"
 
-    if id_.startswith("SABnzbd_nzo"):
-
-        async def get_files():
-            res = await sabnzbd_client.get_files(id_)
-            return res
-
-        res = web_loop.run_until_complete(get_files())
-        cont = make_tree(res, "nzb")
     elif len(id_) > 20:
         res = qbittorrent_client.torrents_files(torrent_hash=id_)
         cont = make_tree(res, "qbit")
@@ -756,21 +741,7 @@ def list_torrent_contents(id_):
 def set_priority(id_):
     data = dict(request.form)
 
-    if id_.startswith("SABnzbd_nzo"):
-
-        to_remove = []
-        for i, value in data.items():
-            if "filenode" in i and value != "on":
-                node_no = i.split("_")[-1]
-                to_remove.append(node_no)
-
-        async def remove_files():
-            await sabnzbd_client.remove_file(id_, to_remove)
-
-        web_loop.run_until_complete(remove_files())
-        LOGGER.info(f"Verified! nzo_id: {id_}")
-
-    elif len(id_) > 20:
+    if len(id_) > 20:
         resume = ""
         pause = ""
         for i, value in data.items():
