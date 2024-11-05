@@ -20,14 +20,13 @@ natsort
 pillow
 psutil
 pymongo
-pyrofork
+electrogram
 python-dotenv
 python-magic
 qbittorrent-api
 requests
 telegraph
 tenacity
-tgcrypto
 urllib3
 uvloop
 xattr
