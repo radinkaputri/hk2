@@ -9,7 +9,7 @@ from asyncio import (
     sleep,
 )
 
-from bot import user_data, config_dict, bot_loop
+from bot import user_data, config_dict, bot_loop, OWNER_ID
 from ..telegram_helper.button_build import ButtonMaker
 from .telegraph_helper import telegraph
 from .help_messages import (
@@ -46,6 +46,21 @@ def _build_command_usage(help_dict, command_key):
     COMMAND_USAGE[command_key] = [help_dict["main"], buttons.build_menu(3)]
     buttons.reset()
 
+async def delete_links(message):
+    if message.from_user.id == OWNER_ID and message.chat.type == message.chat.type.PRIVATE:
+        return
+
+    if config_dict['DELETE_LINKS']:
+        try:
+            if reply_to := message.reply_to_message:
+                await sleep(2)
+                await reply_to.delete()
+                await message.delete()
+            else:
+                await sleep(2)
+                await message.delete()
+        except Exception as e:
+            LOGGER.error(str(e))
 
 def create_help_buttons():
     _build_command_usage(MIRROR_HELP_DICT, "mirror")

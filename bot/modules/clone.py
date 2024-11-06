@@ -9,6 +9,7 @@ from bot import LOGGER, task_dict, task_dict_lock, bot, bot_loop
 from ..helper.ext_utils.bot_utils import (
     sync_to_async,
     cmd_exec,
+    delete_links,
     arg_parser,
     COMMAND_USAGE,
 )
@@ -66,6 +67,7 @@ class Clone(TaskListener):
     async def new_event(self):
         text = self.message.text.split("\n")
         input_list = text[0].split(" ")
+        await delete_links(self.message)
 
         args = {
             "link": "",
@@ -187,7 +189,7 @@ class Clone(TaskListener):
             else:
                 src_path = self.link
                 cmd = [
-                    "rclone",
+                    "xone",
                     "lsjson",
                     "--fast-list",
                     "--stat",

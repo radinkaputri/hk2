@@ -10,6 +10,7 @@ from bot import DOWNLOAD_DIR, bot, config_dict, LOGGER, bot_loop, task_dict_lock
 from ..helper.ext_utils.bot_utils import (
     new_task,
     sync_to_async,
+    delete_links,
     arg_parser,
     COMMAND_USAGE,
 )
@@ -348,6 +349,8 @@ class YtDlp(TaskListener):
         bulk_end = 0
         reply_to = None
         opt = args["-opt"]
+        
+        await delete_links(self.message)
 
         if not isinstance(is_bulk, bool):
             dargs = is_bulk.split(":")

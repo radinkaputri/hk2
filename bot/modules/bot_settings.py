@@ -683,6 +683,9 @@ async def load_config():
     if DEFAULT_UPLOAD != "rc":
         DEFAULT_UPLOAD = "gd"
 
+    DELETE_LINKS = environ.get("DELETE_LINKS", "")
+    DELETE_LINKS = DELETE_LINKS.lower() == "true"
+
     RCLONE_FLAGS = environ.get("RCLONE_FLAGS", "")
     if len(RCLONE_FLAGS) == 0:
         RCLONE_FLAGS = ""
@@ -934,6 +937,7 @@ async def load_config():
             "CMD_SUFFIX": CMD_SUFFIX,
             "DATABASE_URL": DATABASE_URL,
             "DEFAULT_UPLOAD": DEFAULT_UPLOAD,
+            "DELETE_LINKS": DELETE_LINKS,
             "DOWNLOAD_DIR": DOWNLOAD_DIR,
             "EQUAL_SPLITS": EQUAL_SPLITS,
             "EXTENSION_FILTER": EXTENSION_FILTER,
