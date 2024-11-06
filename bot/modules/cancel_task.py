@@ -1,8 +1,9 @@
 from asyncio import sleep
+from re import search as re_search
 from pyrogram.filters import command, regex
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 
-from bot import task_dict, bot, task_dict_lock, OWNER_ID, user_data, multi_tags
+from bot import task_dict, bot, bot_name, task_dict_lock, OWNER_ID, user_data, multi_tags
 from ..helper.ext_utils.bot_utils import new_task
 from ..helper.ext_utils.status_utils import (
     get_task_by_gid,
@@ -23,16 +24,29 @@ from ..helper.telegram_helper.message_utils import (
 @new_task
 async def cancel_task(_, message):
     user_id = message.from_user.id if message.from_user else message.sender_chat.id
-    msg = message.text.split()
-    if len(msg) > 1:
-        gid = msg[1]
+    msg = re_search(
+        rf"/(?:{BotCommands.CancelTaskCommand})(?:@{bot_name})?[_ ]([a-zA-Z0-9_-]+)(?:@{bot_name})?",
+        message.text
+    )
+    try:
+        gid = msg.group(1)  # type: ignore
+    except AttributeError:
+        gid = None
+    if gid is not None:
         if len(gid) == 4:
             multi_tags.discard(gid)
             return
         else:
             task = await get_task_by_gid(gid)
             if task is None:
-                await send_message(message, f"GID: <code>{gid}</code> Not Found.")
+                tmsg = await send_message(
+                    message,
+                    f"GID: <code>{gid}</code> Not Found."
+                )
+                await auto_delete_message(
+                    message,
+                    tmsg
+                )
                 return
     elif reply_to_id := message.reply_to_message_id:
         async with task_dict_lock:
@@ -40,10 +54,10 @@ async def cancel_task(_, message):
         if task is None:
             await send_message(message, "This is not an active task!")
             return
-    elif len(msg) == 1:
+    elif msg is None or len(msg) == 1:
         msg = (
             "Reply to an active Command message which was used to start the download"
-            f" or send <code>/{BotCommands.CancelTaskCommand[0]} GID</code> to cancel it!"
+            f" or send <code>/{BotCommands.CancelTaskCommand} GID</code> to cancel it!"
         )
         await send_message(message, msg)
         return
@@ -186,6 +200,14 @@ bot.add_handler(
         cancel_task,
         filters=command(BotCommands.CancelTaskCommand, case_sensitive=True)
         & CustomFilters.authorized,
+    )
+)
+bot.add_handler(
+    MessageHandler(
+        cancel_task,
+        filters=regex(
+            rf"^/{BotCommands.CancelTaskCommand}(_\w+)?(?!all)"
+        ) & CustomFilters.authorized,
     )
 )
 bot.add_handler(

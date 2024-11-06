@@ -201,8 +201,8 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
             msg += f" | <b>Time: </b>{task.seeding_time()}"
         else:
             msg += f"\n<b>Size: </b>{task.size()}"
-        msg += f"\n<b>Gid: </b><code>{task.gid()}</code> | <b>By: </b><code>{task.listener.message.from_user.mention(style='html')}</code>"
-        msg += f"\n<b>Stop: </b><code>/{BotCommands.CancelTaskCommand[0]} {task.gid()}</code>\n\n"
+        msg += f"\n<b>By: </b><code>{task.listener.message.from_user.mention(style='html')}</code>"
+        msg += f"\n<b>Stop: </b>/{BotCommands.CancelTaskCommand}_{task.gid()}\n\n"
 
     if len(msg) == 0:
         if status == "All":
