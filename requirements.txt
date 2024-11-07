@@ -20,7 +20,7 @@ natsort
 pillow
 psutil
 pymongo
-electrogram
+pyrofork
 python-dotenv
 python-magic
 qbittorrent-api
